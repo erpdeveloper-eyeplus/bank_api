@@ -1,0 +1,88 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-08-17 10:06:19.812370",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "amount",
+  "merchant_tran_id",
+  "create_bank_api_log",
+  "bank_api_log",
+  "ref_id",
+  "create_payment_url",
+  "payment_url",
+  "sms_number"
+ ],
+ "fields": [
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "reqd": 1
+  },
+  {
+   "fieldname": "bank_api_log",
+   "fieldtype": "Link",
+   "label": "Bank API Log",
+   "options": "Bank API Log",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.bank_api_log",
+   "fieldname": "create_payment_url",
+   "fieldtype": "Button",
+   "label": "Create Payment URL"
+  },
+  {
+   "fieldname": "create_bank_api_log",
+   "fieldtype": "Button",
+   "in_list_view": 1,
+   "label": "Create Bank API Log"
+  },
+  {
+   "fieldname": "merchant_tran_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Merchant Tran ID",
+   "no_copy": 1,
+   "read_only_depends_on": "eval:doc.bank_api_log",
+   "unique": 1
+  },
+  {
+   "fieldname": "ref_id",
+   "fieldtype": "Data",
+   "label": "Ref ID",
+   "no_copy": 1,
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "payment_url",
+   "fieldtype": "Data",
+   "label": "Payment URL",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "sms_number",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "SMS Number"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-08-17 15:33:43.349898",
+ "modified_by": "Administrator",
+ "module": "Bank API",
+ "name": "Bank API Amount Splitup Table",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
