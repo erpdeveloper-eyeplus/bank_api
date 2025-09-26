@@ -76,6 +76,7 @@
    "in_list_view": 1,
    "label": "billNumber",
    "no_copy": 1,
+   "read_only": 1,
    "reqd": 1,
    "unique": 1
   },
@@ -205,9 +206,10 @@
    "read_only": 1
   }
  ],
+ "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-09-20 13:18:21.285848",
+ "modified": "2025-09-26 12:21:55.063283",
  "modified_by": "Administrator",
  "module": "Bank API",
  "name": "Bank API Log",

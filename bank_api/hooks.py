@@ -29,7 +29,7 @@ app_license = "mit"
 
 # include js in doctype views
 doctype_js = {"Sales Order" : "/bank_api/utils/js/sales_order.js"}
-# doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
+doctype_list_js = {"Sales Order": "/bank_api/utils/js/sales_order_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 
@@ -124,7 +124,7 @@ doctype_js = {"Sales Order" : "/bank_api/utils/js/sales_order.js"}
 
 doc_events = {
 	"Sales Order": {
-		"validate": "bank_api.bank_api.utils.py.sales_order.validate",
+		"on_update_after_submit": "bank_api.bank_api.utils.py.sales_order.validate",
 	}
 }
 

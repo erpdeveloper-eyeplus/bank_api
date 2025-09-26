@@ -1,4 +1,10 @@
 frappe.ui.form.on("Sales Order", {
+    refresh: function(frm) {
+        update_payment_status_color(frm);
+    },
+    validate: function(frm) {
+        update_payment_status_color(frm);
+    },
     custom_splitup_count: function(frm) {
         console.log("Triggered custom_splitup_count");
 
@@ -55,7 +61,28 @@ frappe.ui.form.on("Sales Order", {
     }
 });
 
+function update_payment_status_color(frm) {
+    let status = frm.doc.custom_payment_status;
+
+    let color = "black"; // default
+    if (status == "Not Received") color = "red";
+    else if (status == "Payment Link Created") color = "orange";
+    else if (status == "Partial Payment Received") color = "blue";
+    else if (status == "Fully Payment Received") color = "green";
+
+    // Use jQuery to set field color
+    $(frm.fields_dict.custom_payment_status.wrapper).find(".control-value").css("color", color);
+}
+
+
 frappe.ui.form.on("Bank API Amount Splitup Table", {
+    // amount: function(frm, cdt, cdn) {
+    //     let row = locals[cdt][cdn];
+    //     if (row.amount) {
+    //         frappe.model.set_value(cdt, cdn, "merchant_tran_id", row.name);
+    //         frm.save();
+    //     }
+    // },
     create_bank_api_log: function(frm, cdt, cdn) {
         let row = locals[cdt][cdn];
         // ✅ Validation

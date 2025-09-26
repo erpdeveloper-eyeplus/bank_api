@@ -1,5 +1,5 @@
 import sys, os, json, frappe
-from frappe.utils import now
+from frappe.utils import now, flt
 from http import HTTPStatus
 
 # ✅ Ensure Python can find `httpcore` inside `src`
@@ -72,6 +72,56 @@ def callback():
         doc.db_set("txn_init_date", decrypted_payload.get("TxnInitDate"))
         doc.db_set("txn_completion_date", decrypted_payload.get("TxnCompletionDate"))
         doc.db_set("callback_received_at", now())
+        bill_number = doc.billnumber  # Example: "SAL-ORD-2025-00046 - h0ae9ai1l2"
+
+        if bill_number:
+            try:
+                # Split billNumber -> Sales Order ID + child row ID
+                so_name, row_id = bill_number.split(" - ")
+
+                frappe.log_error(f"Bill Number Split: so_name={so_name}, row_id={row_id}", "Callback Debug")
+
+                so_doc = frappe.get_doc("Sales Order", so_name)
+                frappe.log_error(f"Fetched Sales Order {so_name}", "Callback Debug")
+
+                updated = False
+                for row in so_doc.custom_amount__and_bank_api_details:
+                    if row.name == row_id:
+                        old_paid = row.paid_amount
+                        old_status = row.payment_status
+
+                        row.paid_amount = flt(decrypted_payload.get("PayerAmount"))
+                        row.payment_status = decrypted_payload.get("TxnStatus")
+                        updated = True
+
+                        frappe.log_error(
+                            f"Updating child row {row_id}: "
+                            f"paid_amount {old_paid} -> {row.paid_amount}, "
+                            f"payment_status {old_status} -> {row.payment_status}",
+                            "Callback Debug"
+                        )
+                        break
+
+                if not updated:
+                    frappe.log_error(f"Child row {row_id} not found in Sales Order {so_name}", "Callback Debug")
+                from bank_api.bank_api.utils.py.sales_order import validate   # type: ignore
+
+                # Run your custom validate logic manually
+                validate(so_doc, "on_update_after_submit")
+
+                # Allow saving after submit
+                so_doc.flags.ignore_permissions = True
+                so_doc.flags.ignore_validate_update_after_submit = True  
+
+                so_doc.save()
+                frappe.db.commit()
+
+
+                frappe.log_error(f"Sales Order {so_name} saved successfully", "Callback Debug")
+
+            except Exception as e:
+                frappe.log_error(f"Failed to update Sales Order child table: {str(e)}", "Callback Error")
+
 
         return {
             "http_status_code": HTTPStatus.OK,

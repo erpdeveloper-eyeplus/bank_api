@@ -2,26 +2,58 @@ import frappe
 import json
 from bank_api.bank_api.doctype.bank_api_log.bank_api_log import send_qr3_request
 def validate(doc, action):
+    # --- Bank API Splitup Details ---
+    has_payment_url = False
+    tot_amt = 0
+    rece_cash_amt = 0
+
     if doc.custom_amount__and_bank_api_details:
-        tot_amt = 0
         for row in doc.custom_amount__and_bank_api_details:
             if row.amount:
                 tot_amt += row.amount
+            if row.paid_amount:
+                rece_cash_amt += row.paid_amount
+            if row.payment_url:  
+                has_payment_url = True
 
-        # Set total and difference
+        # Set totals
         doc.custom_total_amount_in_splitup = tot_amt
         diff_amt = doc.grand_total - tot_amt
         doc.custom_difference_amount = diff_amt
+        doc.custom_received_amount_bank = rece_cash_amt
 
-        # Show message if mismatch
-        if diff_amt != 0:
-            frappe.msgprint(
-                f"⚠️ The split-up total ({tot_amt}) does not match the Grand Total ({doc.grand_total}). "
-                f"Difference: {diff_amt}"
-            )
+        # Show warning if mismatch
+        # if diff_amt != 0:
+        #     frappe.msgprint(
+        #         f"⚠️ The split-up total ({tot_amt}) does not match the Grand Total ({doc.grand_total}). "
+        #         f"Difference: {diff_amt}"
+        #     )
     else:
         doc.custom_total_amount_in_splitup = 0
         doc.custom_difference_amount = 0
+        doc.custom_received_amount_bank = 0
+
+    # --- Service Order Payment Details ---
+    rece_cash_amt = 0
+    if doc.custom_service_order_payment_details:
+        for i in doc.custom_service_order_payment_details:
+            if i.amount:
+                rece_cash_amt += i.amount
+    doc.custom_received_amount = rece_cash_amt
+
+    # --- Payment Status Logic ---
+    total_received = (doc.custom_received_amount or 0) + (doc.custom_received_amount_bank or 0)
+    if total_received == 0:
+        if has_payment_url:  
+            doc.custom_payment_status = "Payment Link Created"
+        else:
+            doc.custom_payment_status = "Not Received"
+    else:
+        if total_received >= doc.grand_total:
+            doc.custom_payment_status = "Fully Payment Received"
+        else:
+            doc.custom_payment_status = "Partial Payment Received"
+
 
 @frappe.whitelist()
 def create_bank_api_log(doc):
