@@ -1,6 +1,8 @@
 import frappe
 import json
-from bank_api.bank_api.doctype.bank_api_log.bank_api_log import send_qr3_request
+from bank_api.bank_api.doctype.bank_api_log.bank_api_log import send_qr3_request, generate_qr_code
+import random
+import string
 def validate(doc, action):
     # --- Bank API Splitup Details ---
     has_payment_url = False
@@ -218,7 +220,124 @@ def format_mobile_with_country_code(mobile):
         mobile = "91" + mobile
     return mobile
 
+def generate_merchant_tran_id():
+    """Generate unique 8-character alphanumeric Merchant Tran ID"""
+    characters = string.ascii_uppercase + string.digits
+    while True:
+        tran_id = ''.join(random.choices(characters, k=8))
+        exists = frappe.db.exists("Bank API Log", {"merchanttranid": tran_id})
+        if not exists:
+            return tran_id
+        
 
 
+@frappe.whitelist()
+def final_function(sales_order_name):
+    try:
+        so_doc = frappe.get_doc("Sales Order", sales_order_name)
 
+        # --- Run Sales Order validation ---
+        validate(so_doc, "on_update_after_submit")
+        so_doc.flags.ignore_permissions = True
+        so_doc.flags.ignore_validate_update_after_submit = True
+        so_doc.save()
+        frappe.db.commit()
 
+        # --- Validation before processing ---
+        if not so_doc.custom_amount__and_bank_api_details:
+            frappe.throw("No payment rows found. Please add amount details before proceeding.")
+
+        missing_amount_rows = [row.idx for row in so_doc.custom_amount__and_bank_api_details if not row.amount]
+        if missing_amount_rows:
+            frappe.throw(f"Amount not filled for rows: {', '.join(map(str, missing_amount_rows))}")
+
+        updated_rows = []
+
+        for row in so_doc.custom_amount__and_bank_api_details:
+            if not row.merchant_tran_id:
+                row.merchant_tran_id = generate_merchant_tran_id()
+
+            if not row.bank_api_log:
+                bank_log_doc = create_bank_api_log({
+                    "doctype": "Bank API Log",
+                    "amount": row.amount,
+                    "merchantid": "9338921",
+                    "terminalid": "5411",
+                    "merchanttranid": row.merchant_tran_id,
+                    "billnumber": f"{so_doc.name} - {row.name}"
+                })
+                row.bank_api_log = bank_log_doc.get("bank_api_log")
+
+            if not row.payment_url:
+                qr_result = generate_qr_code(row.bank_api_log)
+                row.payment_url = qr_result.get("upi_link")
+
+            updated_rows.append({
+                "row_name": row.name,
+                "merchant_tran_id": row.merchant_tran_id,
+                "bank_api_log": row.bank_api_log,
+                "payment_url": row.payment_url
+            })
+
+        # --- Save updates back ---
+        so_doc.save(ignore_permissions=True)
+        frappe.db.commit()
+
+        # --- Send SMS directly here ---
+        if so_doc.custom_common_number:
+            mobile_number = so_doc.custom_moile_number
+            if not mobile_number:
+                frappe.throw("Please enter Mobile Number for sending SMS (Common Number).")
+
+            # ✅ Ensure +91 country code
+            mobile_number = format_mobile_with_country_code(mobile_number)
+
+            for row in so_doc.custom_amount__and_bank_api_details:
+                if not row.payment_url:
+                    frappe.throw(f"No payment URL for row {row.name}, cannot send SMS.")
+
+                send_sms_via_msg91(
+                    mobiles=mobile_number,
+                    customer_name=so_doc.customer_name,
+                    amount=row.amount,
+                    order_no=so_doc.name,
+                    payment_url=row.payment_url
+                )
+
+            sms_response = "SMS sent to common number."
+
+        elif so_doc.custom_different_number:
+            for row in so_doc.custom_amount__and_bank_api_details:
+                if not row.sms_number:
+                    frappe.throw(f"No mobile number for Row -{row.idx}, cannot send SMS.")
+
+                if not row.payment_url:
+                    frappe.throw(f"No payment URL for row {row.name}, cannot send SMS.")
+
+                # ✅ Ensure +91 country code
+                sms_number = format_mobile_with_country_code(row.sms_number)
+
+                send_sms_via_msg91(
+                    mobiles=sms_number,
+                    customer_name=so_doc.customer_name,
+                    amount=row.amount,
+                    order_no=so_doc.name,
+                    payment_url=row.payment_url
+                )
+
+            sms_response = "SMS sent to different numbers."
+
+        else:
+            frappe.throw("Please select either Common Number or Different Number before sending SMS.")
+
+        return {
+            "status": "success",
+            "response": {
+                "payment_update": "Payment rows updated successfully",
+                "sms_result": sms_response,
+                "updated_rows": updated_rows
+            }
+        }
+
+    except Exception:
+        return {"status": "error", "traceback": frappe.get_traceback()}

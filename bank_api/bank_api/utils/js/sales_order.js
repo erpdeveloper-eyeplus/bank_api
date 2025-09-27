@@ -45,20 +45,28 @@ frappe.ui.form.on("Sales Order", {
         frm.refresh_field("custom_amount__and_bank_api_details");
     },
     custom_send_sms: function(frm) {
+        if (frm.is_dirty()) {
+            frappe.msgprint(__('Please save the document before proceeding.'));
+            return;
+        }
         frappe.call({
-            method: "bank_api.bank_api.utils.py.sales_order.send_payment_sms",
-            args: {
-                docname: frm.doc.name
-            },
-            callback: function(r) {
-                if (!r.exc) {
-                    frappe.msgprint(__("SMS sent successfully"));
-                }
-            },
+            method: "bank_api.bank_api.utils.py.sales_order.final_function",
+            args: { sales_order_name: frm.doc.name },
             freeze: true,
-            freeze_message: __("Sending SMS...")
+            freeze_message: __("Processing and Sending SMS..."),
+            callback: function(r) {
+                if (r.message) {
+                    if (r.message.status === "success") {
+                        let sms_msg = r.message.response.sms_result || "SMS sent successfully.";
+                        frappe.msgprint(__(sms_msg));
+                    }  else if (r.message.status === "error") {
+                        frappe.msgprint(__(r.message.traceback || r.message.message));
+                    }
+                    frm.reload_doc();
+                }
+            }
         });
-    }
+    }    
 });
 
 function update_payment_status_color(frm) {
