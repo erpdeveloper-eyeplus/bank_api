@@ -1,12 +1,20 @@
 frappe.ui.form.on("Sales Order", {
     refresh: function(frm) {
-        update_payment_status_color(frm);
+        update_payment_status(frm);
     },
-    validate: function(frm) {
-        update_payment_status_color(frm);
+    custom_received_amount: function(frm) {
+        update_payment_status(frm);
     },
+    custom_received_amount_bank: function(frm) {
+        update_payment_status(frm);
+    },
+    custom_amount__and_bank_api_details: function(frm) {
+        update_payment_status(frm);
+    },
+    // validate: function(frm) {
+    //     update_payment_status(frm);
+    // },
     custom_splitup_count: function(frm) {
-        console.log("Triggered custom_splitup_count");
 
         let split_count = cint(frm.doc.custom_splitup_count || 0);
         let total_amount = flt(frm.doc.grand_total || 0);
@@ -69,6 +77,23 @@ frappe.ui.form.on("Sales Order", {
     }    
 });
 
+function update_payment_status(frm) {
+    let total_received = (frm.doc.custom_received_amount || 0) + (frm.doc.custom_received_amount_bank || 0);
+    let has_payment_url = (frm.doc.custom_amount__and_bank_api_details || []).some(row => row.payment_url);
+
+    if (total_received == 0) {
+        frm.set_value("custom_payment_status", has_payment_url ? "Payment Link Created" : "Not Received");
+    } else {
+        if (total_received >= frm.doc.grand_total) {
+            frm.set_value("custom_payment_status", "Fully Payment Received");
+        } else {
+            frm.set_value("custom_payment_status", "Partial Payment Received");
+        }
+    }
+
+    update_payment_status_color(frm);
+}
+
 function update_payment_status_color(frm) {
     let status = frm.doc.custom_payment_status;
 
@@ -78,8 +103,9 @@ function update_payment_status_color(frm) {
     else if (status == "Partial Payment Received") color = "blue";
     else if (status == "Fully Payment Received") color = "green";
 
-    // Use jQuery to set field color
-    $(frm.fields_dict.custom_payment_status.wrapper).find(".control-value").css("color", color);
+    $(frm.fields_dict.custom_payment_status.wrapper)
+        .find(".control-value")
+        .css("color", color);
 }
 
 

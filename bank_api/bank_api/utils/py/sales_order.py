@@ -329,7 +329,26 @@ def final_function(sales_order_name):
 
         else:
             frappe.throw("Please select either Common Number or Different Number before sending SMS.")
+        
+        # --- ✅ Update Payment Status after everything ---
+        total_received = (so_doc.custom_received_amount or 0) + (so_doc.custom_received_amount_bank or 0)
+        has_payment_url = any(row.payment_url for row in so_doc.custom_amount__and_bank_api_details)
 
+        if total_received == 0:
+            if has_payment_url:
+                so_doc.custom_payment_status = "Payment Link Created"
+            else:
+                so_doc.custom_payment_status = "Not Received"
+        else:
+            if total_received >= so_doc.grand_total:
+                so_doc.custom_payment_status = "Fully Payment Received"
+            else:
+                so_doc.custom_payment_status = "Partial Payment Received"
+
+        # Save final status update
+        so_doc.save(ignore_permissions=True)
+        frappe.db.commit()
+        
         return {
             "status": "success",
             "response": {
